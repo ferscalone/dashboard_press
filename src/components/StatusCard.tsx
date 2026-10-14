@@ -31,6 +31,14 @@ export function StatusCard({ telemetry }: Props) {
             <span className="val empty">–</span>
           )}
         </div>
+        {typeof telemetry?.motor_en === "number" && (
+          <div className="row">
+            <span>Мотор</span>
+            <span className={`tag ${telemetry.motor_en === 1 ? "ok" : ""}`}>
+              {telemetry.motor_en === 1 ? "включён" : "отключён · нет нагрузки"}
+            </span>
+          </div>
+        )}
         <div className="row">
           <span>Аптайм</span>
           {telemetry ? (

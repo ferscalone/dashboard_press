@@ -363,6 +363,11 @@ body {
   border-color: var(--danger);
   color: oklch(100% 0 0);
 }
+.ctl-btn.stop:disabled {
+  border-color: var(--border-2);
+  background: transparent;
+  color: var(--faint);
+}
 .ctl-btn svg {
   width: 15px;
   height: 15px;
@@ -934,30 +939,135 @@ a.chip {
 .log-line.ev-cycle { color: var(--text); }
 .log-line.ev-done { color: var(--ok); font-weight: 600; }
 
-/* ── Диалог подтверждения калибровки нуля кулачков ───────────────────────── */
+/* ── Калибровка нуля кулачков: окно входа и панель режима ─────────────────── */
 .modal.calib-modal {
-  max-width: 520px;
+  max-width: 440px;
 }
 .calib-modal p {
-  margin: 0 0 var(--sp-3);
+  margin: 0;
   color: var(--text);
   font-size: 14px;
   line-height: 1.45;
 }
-.calib-modal .calib-dirs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-3);
-  margin-top: var(--sp-4);
+.text-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--panel-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  color: var(--text-hi);
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 15px;
 }
-.calib-modal .calib-dirs .ctl-btn {
+.text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-weak);
+}
+.calib-card {
+  border-color: color-mix(in oklch, var(--warn) 55%, var(--border));
+}
+.calib-readout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.calib-readout > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.calib-readout .lbl {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.calib-readout .val {
+  font-size: 20px;
+  color: var(--text-hi);
+  font-weight: 600;
+}
+.calib-readout .tag {
+  align-self: flex-start;
+}
+.calib-lock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-3);
+  border-radius: var(--r-md);
+  background: color-mix(in oklch, var(--warn) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--warn) 45%, transparent);
+  font-size: 13px;
+}
+.calib-sections {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-4);
+}
+.calib-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.calib-section-title {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.calib-btns {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+.calib-btns .ctl-btn {
+  width: auto;
+  flex: 1 1 0;
+  min-width: 64px;
   height: auto;
-  min-height: 46px;
+  padding: 0 12px;
   font-family: inherit;
 }
-.calib-modal .calib-dir-hint {
+.calib-hint {
   color: var(--muted);
-  font-size: 12.5px;
-  margin-top: 6px;
-  text-align: center;
+  font-size: 12px;
+}
+/* Переключатель направления поворота (− / +). */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.seg button {
+  min-width: 40px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.seg button.on {
+  background: var(--accent);
+  color: oklch(100% 0 0);
+}
+.seg button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+@media (max-width: 900px) {
+  .calib-readout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .calib-sections {
+    grid-template-columns: 1fr;
+  }
 }

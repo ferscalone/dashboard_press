@@ -39,15 +39,20 @@ export interface Telemetry {
   // калибровкой нуля кулачков. Необязательное: его наличие заодно означает, что
   // прошивка поддерживает калибровку (старая прошивка поле не присылает).
   home_abs_deg?: number;
+  // Драйвер мотора включён (0 - отключён автоматически, пока нет нагрузки).
+  motor_en?: number; // 0 | 1
+  // В режиме калибровки вал сейчас движется (вращение или поворот на угол).
+  calib_busy?: number; // 0 | 1
 }
 
 /** Кадр мгновенного дискретного события (смена состояния / park / ошибка / ack команды / tare). */
 export interface StandEvent {
-  event: "state" | "park" | "error" | "wall" | "ack" | "tare" | "calib";
+  event: "state" | "park" | "error" | "wall" | "ack" | "tare" | "calib" | "motor";
   // Для "ack": "<CMD>:ok" или "<CMD>:ignored_<STATE|reason>" (см. onCommand прошивки).
   // Для "tare": "off=<new> prev=<old>" (сырые отсчёты) при успешном перетарировании.
   // Для "calib": "home=<new> prev=<old>" (градусы) при принятом нуле, либо
-  // "cancelled" / "aborted_travel" / "aborted_load".
+  // "cancelled" / "timeout" / "aborted_travel" / "aborted_load".
+  // Для "motor": "released" - мотор отключён без нагрузки.
   detail: string;
   uptime_ms: number;
 }
@@ -60,7 +65,8 @@ export interface ConfigApplyResponse {
 }
 
 /** Текстовые кадры команд, понимаемые прошивкой. */
-export type Command = "seek" | "home" | "stop" | "tare" | "calib_plus" | "calib_minus";
+// Команды калибровки идут не сюда, а через POST /v1/calib с токеном входа (useCalib).
+export type Command = "seek" | "home" | "stop" | "tare";
 
 /** Жизненный цикл WebSocket-соединения для индикатора в шапке. */
 export type ConnStatus = "connected" | "reconnecting" | "disconnected";

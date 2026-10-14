@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { clearStoredHost, defaultHost, resolveHost, setStoredHost } from "./config";
 import { useStand, type LogEntry } from "./hooks/useStand";
 import { useTheme } from "./hooks/useTheme";
+import { useCalib } from "./hooks/useCalib";
 import { useCoordinator } from "./coord/useCoordinator";
 import type { Command } from "./types";
 import { Header } from "./components/Header";
@@ -15,6 +16,7 @@ import { ForceCard } from "./components/ForceCard";
 import { TargetRangeCard } from "./components/TargetRangeCard";
 import { ForceChart } from "./components/ForceChart";
 import { EventLog } from "./components/EventLog";
+import { CalibLoginDialog, CalibrationCard } from "./components/CalibrationCard";
 
 export default function App() {
   const { theme, toggle } = useTheme();
@@ -89,6 +91,38 @@ export default function App() {
 
   const state = telemetry?.state ?? null;
 
+  // ── Калибровка нуля кулачков: вход по логину/паролю (проверяет прошивка) ──────
+  const calib = useCalib(
+    host,
+    useCallback((text: string, isError?: boolean) => note(isError ? "error" : "cmd", text), [note]),
+  );
+  const [loginOpen, setLoginOpen] = useState(false);
+  // Окно входа не переживает потерю права управления.
+  useEffect(() => {
+    if (!gate.allowed) setLoginOpen(false);
+  }, [gate.allowed]);
+  const onLoginSuccess = useCallback(
+    (user: string) => {
+      setLoginOpen(false);
+      reportCmd(`калибровка: вход (${user})`);
+      // Из покоя или аварии - сразу войти в режим; если стенд уже в CALIBRATE
+      // (например, после перезагрузки страницы), сессия просто подхватывает его.
+      if (state === "IDLE" || state === "ERROR") {
+        void calib.act("enter");
+      }
+    },
+    [state, calib, reportCmd],
+  );
+  // Выход из режима калибровки (сохранение, отмена, бездействие) завершает сессию:
+  // следующая калибровка снова потребует логин и пароль.
+  const prevState = useRef(state);
+  useEffect(() => {
+    if (prevState.current === "CALIBRATE" && state !== "CALIBRATE" && state !== null && calib.loggedIn) {
+      calib.logout();
+    }
+    prevState.current = state;
+  }, [state, calib]);
+
   return (
     <div className="app">
       <Header
@@ -110,7 +144,26 @@ export default function App() {
         <AngleDial telemetry={telemetry} />
 
         {/* Ряд 2: управление, target/range */}
-        <ControlsCard state={state} onCommand={guardedSend} telemetry={telemetry} configDirty={configDirty} gate={gate} />
+        {/* Ряд 1б: панель калибровки нуля кулачков - только в режиме калибровки */}
+        {state === "CALIBRATE" && (
+          <CalibrationCard
+            telemetry={telemetry}
+            calib={calib}
+            gate={gate}
+            onOpenLogin={() => setLoginOpen(true)}
+            onStop={() => guardedSend("stop")}
+            onReport={reportCmd}
+          />
+        )}
+
+        <ControlsCard
+          state={state}
+          onCommand={guardedSend}
+          telemetry={telemetry}
+          configDirty={configDirty}
+          gate={gate}
+          onCalibrate={() => setLoginOpen(true)}
+        />
         {/* key={host}: перемонтирование при смене стенда, чтобы карточка конфигурации
             заново взяла начальные значения из телеметрии нового стенда, а не держала
             значения старого. */}
@@ -137,6 +190,9 @@ export default function App() {
       </div>
 
       {archiveOpen && <LogArchive onClose={() => setArchiveOpen(false)} />}
+      {loginOpen && (
+        <CalibLoginDialog calib={calib} onClose={() => setLoginOpen(false)} onSuccess={onLoginSuccess} />
+      )}
       <Toasts toasts={coord.toasts} onDismiss={coord.dismissToast} />
     </div>
   );

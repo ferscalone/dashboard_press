@@ -227,12 +227,22 @@ export function useStand(host: string, observer?: StandObserver): UseStand {
           pushLog("tare", `Ноль кулачков откалиброван: ${m[2]}° → ${m[1]}° (сохранён на стенде)`);
         } else if (ev.detail === "cancelled") {
           pushLog("tare", "Калибровка отменена: ноль не изменён, возврат к прежнему нулю");
+        } else if (ev.detail === "timeout") {
+          pushLog("tare", "Калибровка завершена по бездействию: ноль не изменён");
         } else if (ev.detail === "aborted_load") {
-          pushLog("error", "Калибровка прервана стендом: выросла нагрузка. Ноль не изменён");
+          pushLog("error", "Калибровка: движение остановлено стендом - выросла нагрузка");
         } else if (ev.detail === "aborted_travel") {
-          pushLog("error", "Калибровка прервана стендом: сделано 2 оборота без команды STOP. Ноль не изменён");
+          pushLog("error", "Калибровка: вращение остановлено стендом - 2 оборота без «Стоп»");
         } else {
           pushLog("tare", `Калибровка нуля: ${ev.detail ?? ""}`);
+        }
+        return;
+      }
+      if (ev.event === "motor") {
+        if (ev.detail === "released") {
+          pushLog("sys", "Мотор отключён: нет нагрузки (включится сам при движении)");
+        } else {
+          pushLog("sys", `Мотор: ${ev.detail ?? ""}`);
         }
         return;
       }

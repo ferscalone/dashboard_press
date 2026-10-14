@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { Command, StandState, Telemetry } from "../types";
 import {
   calibAvailability,
@@ -19,6 +19,8 @@ interface Props {
   configDirty?: boolean;
   /** Право управления (канал). Без права кнопки заблокированы с пояснением, кто управляет. */
   gate: Gate;
+  /** Открыть окно входа в режим калибровки нуля кулачков. */
+  onCalibrate: () => void;
 }
 
 const SeekIcon = () => (
@@ -65,8 +67,8 @@ const StopIcon = () => (
 
 /**
  * Четыре элемента управления: SEEK, HOMING, RE-TARE и CALIBRATE (калибровка нуля
- * кулачков; запуск - только через диалог подтверждения с выбором направления, во
- * время калибровки на её месте кнопка STOP). RE-TARE - перезахват нуля
+ * кулачков; вход - только по логину и паролю, во время калибровки на её месте
+ * кнопка STOP, а управление - на панели калибровки). RE-TARE - перезахват нуля
  * тензодатчика. Подпись кнопки - это реальный токен прошивки (SEEK_LOAD / HOMING
  * / RETURN_HOME / RE-TARE); рядом располагается русская расшифровка или причина
  * блокировки. При блокировке показывается почему - оператору не приходится
@@ -75,7 +77,7 @@ const StopIcon = () => (
  * кнопки. RE-TARE зависит от телеметрии `tare_ok` (собственный вердикт защиты
  * прошивки), поэтому активируется только в логическом нуле.
  */
-export function ControlsCard({ state, onCommand, telemetry, configDirty, gate }: Props) {
+export function ControlsCard({ state, onCommand, telemetry, configDirty, gate, onCalibrate }: Props) {
   let seek = seekAvailability(state);
   const homing = gated(homingAvailability(state), gate);
   const tare = gated(tareAvailability(telemetry), gate);
@@ -92,26 +94,20 @@ export function ControlsCard({ state, onCommand, telemetry, configDirty, gate }:
   seek = gated(seek, gate);
   const locked = !gate.allowed;
 
-  // Калибровка нуля кулачков. Запуск - только через диалог (защита от случайного
-  // нажатия); во время калибровки строка превращается в кнопку STOP.
+  // Калибровка нуля кулачков. Вход - через окно логина/пароля; во время калибровки
+  // строка превращается в кнопку STOP (остановить движение, без входа).
   const calibrating = state === "CALIBRATE";
   const calib = gated(calibAvailability(telemetry), gate);
   const calibStop = gated(
     {
-      enabled: true,
+      enabled: telemetry?.calib_busy === 1,
       command: "stop",
       token: "STOP",
-      gloss: "Кулачки в нуле - остановить",
-      reason: "",
+      gloss: "Остановить движение кулачков",
+      reason: "Кулачки стоят - управление на панели калибровки",
     },
     gate,
   );
-  const [calibDialog, setCalibDialog] = useState(false);
-  // Диалог не должен пережить условия запуска: состояние ушло из IDLE/ERROR,
-  // пропала связь или право управления перешло к другому.
-  useEffect(() => {
-    if (calibDialog && !calib.enabled) setCalibDialog(false);
-  }, [calibDialog, calib.enabled]);
 
   return (
     <section className="card col-5 controls-card">
@@ -141,14 +137,14 @@ export function ControlsCard({ state, onCommand, telemetry, configDirty, gate }:
             icon={locked ? <LockedIcon /> : <StopIcon />}
             stop
             onClick={() => calibStop.command && onCommand(calibStop.command)}
-            readyText="Текущий угол станет новым нулём"
+            readyText="Ноль сохраняется на панели калибровки"
           />
         ) : (
           <ControlRow
             avail={calib}
             icon={locked ? <LockedIcon /> : <CalibIcon />}
             secondary
-            onClick={() => calib.enabled && setCalibDialog(true)}
+            onClick={() => calib.enabled && onCalibrate()}
             readyText={
               typeof telemetry?.home_abs_deg === "number"
                 ? `Текущий ноль: ${telemetry.home_abs_deg.toFixed(2)}°`
@@ -157,68 +153,7 @@ export function ControlsCard({ state, onCommand, telemetry, configDirty, gate }:
           />
         )}
       </div>
-      {calibDialog && (
-        <CalibDialog
-          onClose={() => setCalibDialog(false)}
-          onStart={(cmd) => {
-            setCalibDialog(false);
-            onCommand(cmd);
-          }}
-        />
-      )}
     </section>
-  );
-}
-
-/**
- * Подтверждение запуска калибровки нуля кулачков. Вращение начинается только после
- * явного выбора направления здесь; фокус по умолчанию стоит на «Отмена», поэтому
- * случайный Enter/пробел ничего не запускает. Esc и щелчок мимо окна закрывают его.
- */
-function CalibDialog({
-  onClose,
-  onStart,
-}: {
-  onClose: () => void;
-  onStart: (cmd: Command) => void;
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal card calib-modal" role="dialog" aria-modal="true" aria-label="Калибровка нуля кулачков">
-        <div className="title">
-          <h2>Калибровка нуля кулачков</h2>
-          <button className="chip" onClick={onClose} autoFocus>
-            Отмена
-          </button>
-        </div>
-        <p>
-          Кулачки начнут <b>медленно вращаться</b> и не остановятся сами. Когда они встанут
-          в ноль, нажмите <b>STOP</b> на панели или кнопку на стенде - текущее положение
-          будет сохранено как новый ноль.
-        </p>
-        <p>Убедитесь, что в зоне кулачков нет рук и посторонних предметов.</p>
-        <div className="calib-dirs">
-          <div>
-            <button className="ctl-btn" onClick={() => onStart("calib_plus")}>
-              Вращать «+»
-            </button>
-            <div className="calib-dir-hint">в сторону поджатия платы</div>
-          </div>
-          <div>
-            <button className="ctl-btn secondary" onClick={() => onStart("calib_minus")}>
-              Вращать «−»
-            </button>
-            <div className="calib-dir-hint">от платы</div>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 
